@@ -1,7 +1,7 @@
 import sublime_plugin, sublime, sys, os
 from sublime import Region
 from functools import partial
-from Server.Utils import all_of_type
+from GulpServer.Utils import all_of_type
 
 
 
@@ -21,6 +21,7 @@ def is_possible_value(setting, possible_values):
 
 class Settings(object):
 	""" A wrapper for a sublime.Settings object """
+
 	# The sublime.Settings object
 	loaded_settings = None
 	settings = {}
@@ -28,21 +29,34 @@ class Settings(object):
 	# Default settings will be used where no user settings have been defined 
 	# name, default value, list of possible values
 	default_settings = {
-		"trim_empty_lines": (False, None),
-		"character_count": (32, None)
+		"scroll_to_error": (True, None),
+		"show_icon_at_error": (True, None),
+		"show_error_popup": (True, None),
+		"show_error_status": (True, None),
+		"show_status_in_view": (False, None),
+		"error_status_format": ("{plugin_name} error, Line {line}, File: {file_name}", None),
+		"error_popup_format": ("Line {line}; {message}", None),
+		"error_icon": ("bookmark", {"dot", "circle", "bookmark", "cross"}),
+		"port": (30048, None)
 	}
+	
+	settings_path = 'gulpserver.sublime-settings'
 
-	# Case sensitive 
-	settings_basename = 'Customizations.sublime-settings'
+	def __init__(self, settings_path=None):
+	
+		if isinstance(settings_path, str):
+
+			# Case sensitive 
+			self.settings_path = settings_path
 
 	def load(self):
-		self.loaded_settings = sublime.load_settings(self.settings_basename)
-		self.loaded_settings.clear_on_change('customizations/customizations')
+		self.loaded_settings = sublime.load_settings('gulpserver.sublime-settings')
+		self.loaded_settings.clear_on_change(self.settings_path)
 		self.verify()
-		self.loaded_settings.add_on_change('customizations/customizations', self.load)
+		self.loaded_settings.add_on_change(self.settings_path, self.load)
 
 	def save(self):
-		sublime.save_settings(self.settings_basename)
+		sublime.save_settings(self.settings_path)
 
 	def set(self, key, value):
 		""" Set a value into the sublime.Settings object """
