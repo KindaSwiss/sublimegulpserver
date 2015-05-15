@@ -4,8 +4,8 @@ from sublime import Region
 from functools import partial
 from threading import Thread
 
-from Server.Utils import ignore
-
+from GulpServer.Utils import ignore
+from GulpServer.Settings import Settings
 
 
 
@@ -31,7 +31,7 @@ PORT = 30048
 
 
 
-
+settings = None
 on_received_callbacks = []
 
 
@@ -95,7 +95,12 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 		self.closed = False
 
 		with ignore(Exception, origin="ThreadedTCPRequestHandler.handle"):
-			handshake = json.loads(self.request.recv(2048).decode('UTF-8'))
+			data_bytes = self.request.recv(3072)
+			
+			if not data_bytes:
+				return self.finish()
+
+			handshake = json.loads(data_bytes.decode('UTF-8'))
 
 			if handshake.get('id'):
 				self.id = handshake['id']
@@ -105,7 +110,12 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 				return self.finish()
 
 			while self.should_receieve:
-				data_bytes = self.request.recv(2048)
+				
+				try:
+					data_bytes = self.request.recv(3072)
+				except Exception:
+					break
+
 				if not data_bytes:
 					break
 			
@@ -201,7 +211,9 @@ class StopServerCommand(sublime_plugin.ApplicationCommand):
 def plugin_loaded():
 	# Setting a timeout will ensure the socket is clear for reuse 
 	sublime.set_timeout_async(start_server, 2000)
-
+	global PORT, settings
+	settings = Settings()
+	PORT = settings.get('port')
 
 def plugin_unloaded():
 	stop_server()

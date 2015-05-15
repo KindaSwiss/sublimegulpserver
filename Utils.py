@@ -1,4 +1,4 @@
-import sublime
+import sublime, traceback
 from contextlib import contextmanager
 
 
@@ -10,8 +10,9 @@ def ignore(*exceptions, origin="", message="", print_exception=True):
 		yield exceptions
 	except exceptions as exs:
 		if print_exception:
-			print(exs, '- in', origin, 'with message' if message else '', message)
-
+			print('\n' + origin)
+			traceback.print_exc(limit=None, file=None, chain=True)
+			print()
 
 
 
@@ -80,3 +81,19 @@ def get_views_by_file_names(file_names):
 
 def get_source_scope(view):
 	return view.scope_name(0).split(' ')[0]
+
+
+
+
+def get_view_or_all(file_name):
+	views = None
+	
+	if isinstance(file_name, str):
+		views = get_views_by_file_names(file_name)
+	else: 
+		views = all_views()
+
+	return views
+
+
+
