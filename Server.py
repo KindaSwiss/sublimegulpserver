@@ -4,12 +4,13 @@ from sublime import Region
 from functools import partial
 from threading import Thread
 
-from GulpServer.Utils import ignore
+from GulpServer.Utils import ignore, parse_commands
 from GulpServer.Settings import Settings
 
 
 
-END_OF_MESSAGE = '\n'
+
+END_OF_MESSAGE = b'\n'[0]
 
 
 
@@ -41,15 +42,8 @@ on_received_callbacks = []
 def on_received(callback):
 	""" Add a callback to the server's on_receive event """
 	global on_received_callbacks
-	on_received_callbacks.append(callback)
-
-
-
-
-def parse_commands(data_bytes):
-	data_strings = [string for string in data_bytes.decode('UTF-8').split(END_OF_MESSAGE) if string]
-	commands = [json.loads(data_string) for data_string in data_strings if data_string]
-	return commands
+	on_received_callbacks = [callback]
+	# on_received_callbacks.append(callback)
 
 
 
@@ -95,11 +89,14 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 		self.closed = False
 
 		with ignore(Exception, origin="ThreadedTCPRequestHandler.handle"):
-			data_bytes = self.request.recv(3072)
-			
+			data_bytes = self.request.recv(1024)
+				
 			if not data_bytes:
 				return self.finish()
-
+			
+			while data_bytes[-1] != END_OF_MESSAGE:
+				data_bytes += self.request.recv(4096)
+						
 			handshake = json.loads(data_bytes.decode('UTF-8'))
 
 			if handshake.get('id'):
@@ -112,21 +109,24 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 			while self.should_receieve:
 				
 				try:
-					data_bytes = self.request.recv(3072)
-				except Exception:
+					data_bytes = self.request.recv(4096)
+					
+					if not data_bytes:
+						break
+					
+					# Keep receiving until the end of message is hit
+					while data_bytes[-1] != END_OF_MESSAGE:
+						data_bytes += self.request.recv(4096)
+
+				except Exception as ex:
+					print('Receiving error', ex)
 					break
 
-				if not data_bytes:
-					break
-			
-				# print(data_bytes)
-				
 				# Sockets may queue messages and send them as a single message 
 				# In order to get each JSON object separately, data_bytes must be 
 				# converted to a string and split by END_OF_MESSAGE. The parse_commands 
 				# function will do that and will also run json.loads on each string 
 				commands = parse_commands(data_bytes)
-				# print(commands)
 				
 				for command in commands:
 					for callback in on_received_callbacks:

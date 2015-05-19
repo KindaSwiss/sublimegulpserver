@@ -1,7 +1,7 @@
 import sublime_plugin, sublime, sys, os
 from sublime import Region
 from functools import partial
-from GulpServer.Utils import all_of_type
+from GulpServer.Utils import all_of_type, all_views
 
 
 
@@ -37,20 +37,24 @@ class Settings(object):
 		"error_status_format": ("{plugin_name} error, Line {line}, File: {file_name}", None),
 		"error_popup_format": ("Line {line}; {message}", None),
 		"error_icon": ("bookmark", {"dot", "circle", "bookmark", "cross"}),
-		"port": (30048, None)
+		"port": (30048, None),
+		"max_leading_spaces": (5, None)
 	}
 	
 	settings_path = 'gulpserver.sublime-settings'
 
-	def __init__(self, settings_path=None):
-	
+	def __init__(self, settings_path=None, load=True):
+		
 		if isinstance(settings_path, str):
 
 			# Case sensitive 
 			self.settings_path = settings_path
+			
+		if load:
+			self.load()
 
 	def load(self):
-		self.loaded_settings = sublime.load_settings('gulpserver.sublime-settings')
+		self.loaded_settings = sublime.load_settings(self.settings_path)
 		self.loaded_settings.clear_on_change(self.settings_path)
 		self.verify()
 		self.loaded_settings.add_on_change(self.settings_path, self.load)
@@ -127,4 +131,24 @@ class Settings(object):
 
 
 
+
+class ViewListener(sublime_plugin.EventListener):
+	def on_new(self, view):
+		s = view.settings()
+		s.set('gulp_server', {})
+
+
+
+
+
+
+def plugin_loaded():
+	for view in all_views():
+		s = view.settings()
+		s.set('gulp_server', {})
+		
+		if isinstance(s.get('report_id'), str):
+			s.set('syntax', 'Packages/Default/Find Results.hidden-tmLanguage')
+			s.set('result_file_regex', '^([A-Za-z\\\\/<].*):$')
+			s.set('result_line_regex', '^ +([0-9]+):')
 

@@ -1,4 +1,4 @@
-import sublime, traceback
+import sublime, traceback, json, re
 from contextlib import contextmanager
 
 
@@ -79,12 +79,6 @@ def get_views_by_file_names(file_names):
 
 
 
-def get_source_scope(view):
-	return view.scope_name(0).split(' ')[0]
-
-
-
-
 def get_view_or_all(file_name):
 	views = None
 	
@@ -94,6 +88,89 @@ def get_view_or_all(file_name):
 		views = all_views()
 
 	return views
+
+
+
+
+def get_source_scope(view):
+	return view.scope_name(0).split(' ')[0]
+
+
+
+
+def parse_commands(data_bytes, end_of_message="\n"):
+	data_strings = [string for string in data_bytes.decode('UTF-8').split(end_of_message) if string]
+	commands = [json.loads(data_string) for data_string in data_strings if data_string]
+	return commands
+
+
+
+
+def isstr(value):
+	return isinstance(value, str)
+
+def isdict(value):
+	return isinstance(value, dict)
+
+def islist(value):
+	return isinstance(value, dict)
+
+def isint(value):
+	return isinstance(value, int)
+
+
+
+
+def make_report_view(id):
+	active_window = sublime.active_window()
+	report_view = None
+
+	# If the view has already been created for reporting, use it and replace all 
+	# text with the new report text 
+	if isstr(id):
+		for view in all_views():
+			
+			if view.settings().get('report_id') == id:
+				report_view = view
+
+	# Or create the view if it does not exist 
+	if not report_view:
+		report_view = active_window.new_file()
+		report_view.set_name(id)
+
+		view_settings = report_view.settings()
+		
+		# Set the ID so the view can be identified later 
+		view_settings.set('report_id', id)
+		# Stuff so the opening files will like find-in-files
+		view_settings.set('syntax', 'Packages/Default/Find Results.hidden-tmLanguage')
+		view_settings.set('result_file_regex', '^([A-Za-z\\\\/<].*):$')
+		view_settings.set('result_line_regex', '^ +([0-9]+):')
+
+	return report_view
+
+
+
+
+# param message {str}        The format string 
+# param format_items {dict}  The values used to format the string 
+# param settings {Settings}  The settings to retrieve the format  str from 
+
+def format_message(message_format, format_items, settings=None):
+
+	if settings:
+		message_format = settings.get(message_format)
+	
+	message = message_format.format(**format_items)
+
+	return message
+
+
+
+
+
+
+
 
 
 
