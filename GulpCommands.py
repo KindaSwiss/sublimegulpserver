@@ -55,16 +55,6 @@ class EraseStatusCommand(ViewCommand):
 
 
 
-class HighlightTextLineCommand(ViewCommand):
-	""" Highlight the text in a line """
-	def run(self, id, line, **kwargs):
-
-		for view in self.views:
-			view.add_regions(id, [Region(view.text_point(line, 0))], get_source_scope(view), '', sublime.DRAW_NO_OUTLINE)
-
-
-
-
 class ShowErrorCommand(ViewCommand):
 	"""  """
 	def run(self, id, error, **kwargs):
@@ -121,28 +111,6 @@ class EraseErrorsCommand(ViewCommand):
 
 
 
-class GutterLineCommand(ViewCommand):
-	""" Add a gutter icon to a specific line """
-	def run(self, id, line, **kwargs):
-		icon = kwargs.get('icon', 'bookmark')
-
-		for view in self.views:
-			region = Region(view.text_point(line, 0))
-			view.add_regions(id, [region], get_source_scope(view), icon, sublime.DRAW_NO_OUTLINE)
-			
-
-
-
-class RemoveGutterCommand(ViewCommand):
-	""" Add a gutter icon to a specific line """
-	def run(self, id, **kwargs):
-		
-		for view in self.views:
-			view.erase_regions(id)
-
-
-
-
 class ShowPopupCommand(ViewCommand):
 	""" Show a popup message """ 
 	def run(self, message=None, format=None, format_items=None, **kwargs):
@@ -163,9 +131,6 @@ class ShowPopupCommand(ViewCommand):
 class PrintCommand(Command):
 	def run(self, **kwargs):
 		print(kwargs)
-
-
-
 
 
 
