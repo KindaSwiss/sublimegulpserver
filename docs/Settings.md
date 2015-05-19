@@ -1,66 +1,87 @@
 
 # Settings
-show_error_status
+
+### show_error_status
+
+Default: True
+
+Whether or not to show an error message in the status bar. 
+
+
 
 
 #### scroll_to_error
+
 Default: `true`
 
-Whether or not to scroll to the line where the error when viewing file that caused the error.
-
-
-
-
-#### show_icon_at_error
-Default: `true`
-
-Whether or not to show a gutter icon at the line where the error occured 
+Whether or not to scroll to the line where the error when viewing file that caused the error. 
 
 
 
 
 #### show_error_popup
+
 Default: `true`
 
-Whether or not to show an error popup message when viewing the file that caused the error. Only available in ST3 build 3083 or later.  
+Whether or not to show an error message in a popup when viewing the file that caused the error. Only available in ST3 build 3070 or later.  
+
+
+
+
+#### show_icon_at_error
+
+Default: `true`
+
+Whether or not to show a gutter icon at the line where the error occured. 
 
 
 
 
 #### error_icon
+
 Default: `bookmark`
 
-The type of gutter icon to show. Possible values are `dot`, `circle`, `bookmark`, and `cross`
+The type of gutter icon to show. Possible values are `dot`, `circle`, `bookmark`, and `cross`. 
+
 
 
 
 #### error_popup_format
+
 Default: `Line {line}; {message}`
 
-
+Allows customization of the format of the popup error message. 
 
 
 #### error_status_format
+
 Default: `{plugin_name} error, Line {line}, File: {file_name}`
 
-Customizes the format of status bar error messages. The default format would produce something like `gulp-sass error, line 87, File: _base.sass`
+Allows customization of the format of status bar error messages. 
+
+The default format would produce `gulp-sass error, line 87, File: _base.sass`
 
 
 
 
 #### show_status_in_view
+
 Default: `False`
 
-Whether or not to show the error status messages in all views or to only show the error status message in just the view with the file that caused the error. 
+Whether to show the error status message in the view with the same open file that caused the error or to all open views. 
+
+
 
 
 #### port
+
 Default: `30048`
 
-The port on which gulpfiles will connect 
+The port on which the server will listen and gulp files will connect  
 
 
 
+<br>
 
 ## Formatting error messages 
 Error messages may be customized using the following values. 
