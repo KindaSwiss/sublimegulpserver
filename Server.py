@@ -6,6 +6,7 @@ from threading import Thread
 
 from GulpServer.Utils import ignore, parse_commands
 from GulpServer.Settings import Settings
+from GulpServer.Logging import Console
 
 
 
@@ -32,8 +33,8 @@ PORT = 30048
 
 
 
-settings = None
 on_received_callbacks = []
+
 
 
 
@@ -89,37 +90,23 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 		self.closed = False
 
 		with ignore(Exception, origin="ThreadedTCPRequestHandler.handle"):
-			data_bytes = self.request.recv(1024)
-				
-			if not data_bytes:
-				return self.finish()
 			
-			while data_bytes[-1] != END_OF_MESSAGE:
-				data_bytes += self.request.recv(4096)
-						
+			data_bytes = self.recvall()
+
 			handshake = json.loads(data_bytes.decode('UTF-8'))
 
 			if handshake.get('id'):
 				self.id = handshake['id']
 				self.server.add_client(self)
-				print('"{0}"'.format(self.id), 'connected', '- Total number connections:', len(self.server.clients))
+				console.log('"{0}"'.format(self.id), 'connected', '- Total number connections:', len(self.server.clients))
 			else:
 				return self.finish()
 
 			while self.should_receieve:
 				
-				try:
-					data_bytes = self.request.recv(4096)
-					
-					if not data_bytes:
-						break
-					
-					# Keep receiving until the end of message is hit
-					while data_bytes[-1] != END_OF_MESSAGE:
-						data_bytes += self.request.recv(4096)
+				data_bytes = self.recvall()
 
-				except Exception as ex:
-					print('Receiving error', ex)
+				if not data_bytes:
 					break
 
 				# Sockets may queue messages and send them as a single message 
@@ -144,20 +131,39 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 		# Remove self from list of server clients 
 		self.server.remove_client(self)
 		self.closed = True
+		
 		if not hasattr(self, 'id'):
-			return print('Disconnected', '- Total number of connections', len(self.server.clients))
-		print('"{0}"'.format(self.id), 'disconnected', '- Total number of connections', len(self.server.clients))
+			return console.log('Disconnected', '- Total number of connections', len(self.server.clients))
+		
+		console.log('"{0}"'.format(self.id), 'disconnected', '- Total number of connections', len(self.server.clients))
 
 	def send(self, data):
+		
 		# Send data to the client 
 		with ignore(Exception, origin='ThreadedTCPRequestHandler.send'):
 			data = sublime.encode_value(data)
 			self.request.sendall((data).encode(self.encoding))
 			return
+
 		self.finish()
+	
+	def recvall(self, buffer_size=4096):
 
+		try:
+			data_bytes = self.request.recv(buffer_size)
+			
+			if not data_bytes:
+				return b''
+			
+			# Keep receiving until the end of message is hit
+			while data_bytes[-1] != END_OF_MESSAGE:
+				data_bytes += self.request.recv(buffer_size)
 
+		except Exception as ex:
+			console.log('Receiving error', ex)
+			return b''
 
+		return data_bytes
 
 server = None
 server_thread = None
@@ -165,25 +171,28 @@ server_thread = None
 def start_server():
 	""" Start the server """ 
 	global server, server_thread
+
 	if server != None:
-		return print('Server is already running')
+		return console.log('Server is already running')
+	
 	server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
 	server_thread = Thread(target=server.serve_forever, daemon=True)
 	server_thread.start()
-	print('Server started')
+	console.log('Server started')
 
 
 def stop_server():
 	""" Stop the server """
 	global server
+
 	if server == None:
-		return print('Server is already shutdown')
+		return console.log('Server is already shutdown')
 	
 	server.close_requests()
 	server.shutdown()
 	server = None
 	server_thread = None
-	print('Server stopped')
+	console.log('Server stopped')
 
 
 
@@ -208,12 +217,22 @@ class StopServerCommand(sublime_plugin.ApplicationCommand):
 
 
 
+user_settings = None
+console = None
+
+
+
+
 def plugin_loaded():
 	# Setting a timeout will ensure the socket is clear for reuse 
 	sublime.set_timeout_async(start_server, 2000)
-	global PORT, settings
-	settings = Settings()
-	PORT = settings.get('port')
+	global PORT, user_settings, console
+	console = Console()
+	user_settings = Settings()
+	PORT = user_settings.get('port')
+
+
+
 
 def plugin_unloaded():
 	stop_server()
