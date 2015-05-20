@@ -2,6 +2,7 @@ import sublime_plugin, sublime, sys, os
 from sublime import Region
 from functools import partial
 from GulpServer.Utils import all_of_type, all_views
+from GulpServer.Logging import Console
 
 
 
@@ -38,7 +39,8 @@ class Settings(object):
 		"error_popup_format": ("Line {line}; {message}", None),
 		"error_icon": ("bookmark", {"dot", "circle", "bookmark", "cross"}),
 		"port": (30048, None),
-		"max_leading_spaces": (5, None)
+		"max_leading_spaces": (5, None),
+		"dev": (False, None)
 	}
 	
 	settings_path = 'gulpserver.sublime-settings'
@@ -121,7 +123,8 @@ class Settings(object):
 			if setting_is_valid:
 				self.settings[setting_name] = setting
 			else:
-				print('Customizations: You messed up a setting', setting_name, setting, default)
+				if loaded_settings.get('show_setting_errors'):
+					print('Customizations: You messed up a setting', setting_name, setting, default)
 
 		# print(self.settings)
 			
@@ -141,11 +144,13 @@ class ViewListener(sublime_plugin.EventListener):
 
 
 
+console = None
 
 def plugin_loaded():
 	for view in all_views():
 		s = view.settings()
 		s.set('gulp_server', {})
+		console = Console()
 		
 		if isinstance(s.get('report_id'), str):
 			s.set('syntax', 'Packages/Default/Find Results.hidden-tmLanguage')
