@@ -9,6 +9,7 @@ from GulpServer.Utils import format_message, make_report_view
 from GulpServer.Utils import isstr, islist, isdict, isint
 
 from GulpServer.Settings import Settings
+from GulpServer.Logging import Console
 
 
 
@@ -130,7 +131,7 @@ class ShowPopupCommand(ViewCommand):
 # Print some data 
 class PrintCommand(Command):
 	def run(self, **kwargs):
-		print(kwargs)
+		console.log(kwargs)
 
 
 
@@ -159,8 +160,8 @@ class ReportCommand(Command):
 				error = result.get('error')
 				errors[file_name].append(error)
 
-		for error in errors.values():
-			print([err.get('line') for err in error])
+		# for error in errors.values():
+		# 	console.log([err.get('line') for err in error])
 
 		sorted_errors = {}
 
@@ -204,9 +205,9 @@ def run_command(command_name, args, init_args=None):
 	
 	# Just so large args aren't printed out to the console 
 	if command_name in ['report']:
-		print(command_name)
+		console.log(command_name)
 	else:
-		print(command_name, args, init_args)
+		console.log(command_name, args, init_args)
 	
 	if init_args:
 		command = command_class(**init_args)
@@ -221,7 +222,7 @@ def run_command(command_name, args, init_args=None):
 
 def handle_received(command):
 	with ignore(Exception, origin="handle_received"):
-		# print(command)
+		# console.log(command)
 		command_name = command['command_name']
 		data = command['data']
 		args = data['args']
@@ -249,15 +250,16 @@ def get_commands():
 
 commands = get_commands()
 user_settings = None
-
+console = None
 
 
 
 def plugin_loaded():
-	global user_settings
+	global user_settings, console
 
 	user_settings = Settings()
-	
+	console = Console()
+
 	from GulpServer.Server import on_received
 	on_received(handle_received)
 
