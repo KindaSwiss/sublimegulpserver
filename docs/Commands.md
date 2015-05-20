@@ -61,7 +61,7 @@ The status message to show. If `status` is `None`, `format` and `format_items` m
 
 Type: `str`
 
-The format string of the message e.g. `Line {line}; File {file_name}`. If `from_settings` is True, format will be used as a key to retrieve the format string from Packages/User settings file. 
+The format string of the message e.g. `Line {line}; File {file_name}`. If `settings` is defined, the format parameter will be used as a key to retrieve the format string from Packages/User settings file. 
 
 #### format_items
 
@@ -140,7 +140,7 @@ The ID of the regions and status messages to remove.
 Type: `ViewCommand`
 
 ```Python
-def run(message=None, format=None, format_items=None, from_settings=False):
+def run(message=None, format=None, format_items=None, settings=False):
 ```
 
 Shows a popup in the view with the same file name as the specified file. Arguments work the same as set_status. 

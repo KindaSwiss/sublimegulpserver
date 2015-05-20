@@ -3,7 +3,7 @@
 
 ### show_error_status
 
-Default: True
+Default: `true`
 
 Whether or not to show an error message in the status bar. 
 
