@@ -2,7 +2,7 @@ import sublime_plugin, sublime, sys, os
 from sublime import Region
 from functools import partial
 from GulpServer.Utils import all_of_type, all_views
-from GulpServer.Logging import Console
+
 
 
 
@@ -144,13 +144,11 @@ class ViewListener(sublime_plugin.EventListener):
 
 
 
-console = None
 
 def plugin_loaded():
 	for view in all_views():
 		s = view.settings()
 		s.set('gulp_server', {})
-		console = Console()
 		
 		if isinstance(s.get('report_id'), str):
 			s.set('syntax', 'Packages/Default/Find Results.hidden-tmLanguage')
