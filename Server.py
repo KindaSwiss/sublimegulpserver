@@ -105,7 +105,7 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 			while self.should_receieve:
 				
 				data_bytes = self.recvall()
-
+				
 				if not data_bytes:
 					break
 
@@ -147,13 +147,15 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 
 		self.finish()
 	
+	# Keep receiving until an END_OF_MESSAGE is hit. 
+	
 	def recvall(self, buffer_size=4096):
 
 		try:
 			data_bytes = self.request.recv(buffer_size)
 			
 			if not data_bytes:
-				return b''
+				return data_bytes
 			
 			# Keep receiving until the end of message is hit
 			while data_bytes[-1] != END_OF_MESSAGE:
