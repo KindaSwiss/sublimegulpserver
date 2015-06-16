@@ -6,7 +6,7 @@ from operator import itemgetter
 from GulpServer.Utils import ignore, all_views, get_command_name, get_source_scope
 from GulpServer.Utils import get_views_by_ids, get_views_by_file_names, get_view_or_all
 from GulpServer.Utils import format_message, make_report_view
-from GulpServer.Utils import isstr, islist, isdict, isint
+from GulpServer.Utils import isstr, islist, isdict, isint, nth
 
 from GulpServer.Settings import Settings
 from GulpServer.Logging import Console
@@ -142,8 +142,15 @@ class PrintCommand(Command):
 # Have a keybinding to open / close the output panel 
 class ReportCommand(Command):
 	def run(self, reports, id, **kwargs):
-		active_window = sublime.active_window()
 
+		view = nth(get_views_by_file_names(kwargs.get('task_initiator') or ''), 0)
+		
+		# Don't do any reporting if the tab has reporting turned off 
+		if not view or view.settings().get('gulp_sublime_report') == False:
+			return
+
+
+		active_window = sublime.active_window()
 		errors = {}
 		
 		# Loop through each report, gathering the results from each file 
@@ -160,9 +167,6 @@ class ReportCommand(Command):
 				error = result.get('error')
 				errors[file_name].append(error)
 
-		# for error in errors.values():
-		# 	console.log([err.get('line') for err in error])
-
 		sorted_errors = {}
 
 		# Sort the line numbers from smallest to largest 
@@ -174,7 +178,8 @@ class ReportCommand(Command):
 		# Set the view heading 
 		chars = '{0} results\n'.format(id)
 		
-		# Loop through each error, appending the file name and errors for each result 
+		# Loop through each error, appending the file name and errors for each result to
+		# the string. In the end, the results will display as "Find in Files" results 
 		for file_name, errs in errors.items():
 			chars += '\n{0}:\n'.format(file_name)
 
@@ -205,7 +210,7 @@ def run_command(command_name, args, init_args=None):
 	
 	# Just so large args aren't printed out to the console 
 	if command_name in ['report']:
-		console.log(command_name)
+		console.log(command_name, [key for key in args])
 	else:
 		console.log(command_name, args, init_args)
 	

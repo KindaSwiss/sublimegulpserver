@@ -3,13 +3,12 @@ from contextlib import contextmanager
 
 
 
-
 @contextmanager
-def ignore(*exceptions, origin="", message="", print_exception=True):
+def ignore(*exceptions, origin="", message="", print_ex=True):
 	try:
 		yield exceptions
 	except exceptions as exs:
-		if print_exception:
+		if print_ex:
 			print('\n' + origin)
 			traceback.print_exc(limit=None, file=None, chain=True)
 			print()
@@ -20,7 +19,6 @@ def ignore(*exceptions, origin="", message="", print_exception=True):
 def all_of_type(items, t):
 	""" Check if all items are of a single type """
 	a = all([isinstance(item, t) for item in items])
-	# print('all_of_type', a, items, t)
 	return a
 
 
@@ -168,7 +166,29 @@ def format_message(message_format, format_items, settings=None):
 
 
 
+def nth(items, index):
+	try:
+		return items[index]
+	except Exception:
+		return None
 
+
+
+
+def get_index(index, length, bounds=False):
+	if index < 0:
+		index = index + length
+
+	original_index = index
+
+	if bounds:
+		index = 0 if index < 0 else index
+		index = length if index > length else index
+
+	if original_index == index:
+		return True
+
+	return False
 
 
 
