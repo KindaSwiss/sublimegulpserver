@@ -1,81 +1,80 @@
 
 # Settings
 
+
+### show_status_in_view
+
+__Default:__ `False`
+
+Whether to show the error status message in the view with the same open file that caused the error or to all open views. 
+
+
+
 ### show_error_status
 
-Default: `true`
+__Default:__`true`
 
-Whether or not to show an error message in the status bar. 
-
-
-
-
-#### scroll_to_error
-
-Default: `true`
-
-Whether or not to scroll to the line where the error when viewing file that caused the error. 
+Enables or disables showing error status messages. 
 
 
 
+### scroll_to_error
 
-#### show_error_popup
+__Default:__`true`
 
-Default: `true`
-
-Whether or not to show an error message in a popup when viewing the file that caused the error. Only available in ST3 build 3070 or later.  
+Enables or disables scrolling to the line where the error when viewing file that caused the error. 
 
 
 
 
-#### show_icon_at_error
+### show_error_popup
 
-Default: `true`
+__Default:__`true`
 
-Whether or not to show a gutter icon at the line where the error occured. 
-
-
+Enables or disables showing an error message in a popup when viewing the file that caused the error. Only available in ST3 build 3070 or later.  
 
 
-#### error_icon
 
-Default: `bookmark`
+
+### show_icon_at_error
+
+__Default:__`true`
+
+Enables or disables showing a gutter icon at the line where the error occured. 
+
+
+
+
+### error_icon
+
+__Default:__`bookmark`
 
 The type of gutter icon to show. Possible values are `dot`, `circle`, `bookmark`, and `cross`. 
 
 
 
 
-#### error_popup_format
+### error_popup_format
 
-Default: `Line {line}; {message}`
+__Default:__`Line {line}; {message}`
 
-Allows customization of the format of the popup error message. 
+The template for error message popups. 
 
 
-#### error_status_format
+### error_status_format
 
-Default: `{plugin_name} error, Line {line}, File: {file_name}`
+__Default:__`{plugin_name} error, Line {line}, File: {file_name}`
 
-Allows customization of the format of status bar error messages. 
-
-The default format would produce `gulp-sass error, line 87, File: _base.sass`
+The template for error status messages. 
 
 
 
 
-#### show_status_in_view
-
-Default: `False`
-
-Whether to show the error status message in the view with the same open file that caused the error or to all open views. 
 
 
+### port
 
-
-#### port
-
-Default: `30048`
+__Default:__`30048`
 
 The port on which the server will listen and gulp files will connect  
 

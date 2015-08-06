@@ -40,7 +40,8 @@ class Settings(object):
 		"error_icon": ("bookmark", {"dot", "circle", "bookmark", "cross"}),
 		"port": (30048, None),
 		"max_leading_spaces": (5, None),
-		"dev": (False, None)
+		"dev": (False, None),
+		"report_view": (False, None)
 	}
 	
 	settings_path = 'gulpserver.sublime-settings'
