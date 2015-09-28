@@ -6,7 +6,6 @@ from GulpServer.Utils import all_of_type, all_views
 
 
 
-
 def is_possible_value(setting, possible_values):
 	if isinstance(setting, list):
 		return all([value in possible_values for value in setting])
@@ -27,7 +26,7 @@ class Settings(object):
 	loaded_settings = None
 	settings = {}
 
-	# Default settings will be used where no user settings have been defined 
+	# Default settings will be used where no user settings have been defined
 	# name, default value, list of possible values
 	default_settings = {
 		"scroll_to_error": (True, None),
@@ -43,16 +42,16 @@ class Settings(object):
 		"dev": (False, None),
 		"report_view": (False, None)
 	}
-	
-	settings_path = 'gulpserver.sublime-settings'
+
+	settings_path = 'GulpServer.sublime-settings'
 
 	def __init__(self, settings_path=None, load=True):
-		
+
 		if isinstance(settings_path, str):
 
-			# Case sensitive 
+			# Case sensitive
 			self.settings_path = settings_path
-			
+
 		if load:
 			self.load()
 
@@ -73,8 +72,7 @@ class Settings(object):
 		""" Get a value by key from the settings """
 		return self.settings[key]
 
-
-	# Use the default setting if the setting is missing or not a valid value   
+	# Use the default setting if the setting is missing or not a valid value
 	def verify(self):
 		""" Verify that the settings are correct """
 
@@ -85,7 +83,7 @@ class Settings(object):
 			setting = loaded_settings.get(setting_name, None)
 			both = [setting, default]
 			setting_is_valid = True
-			
+
 			self.settings[setting_name] = default
 
 			if setting == None:
@@ -97,27 +95,27 @@ class Settings(object):
 			if all_of_type(both, bool):
 				pass
 
-			# Check if both are of type int  
+			# Check if both are of type int
 			elif all_of_type(both, int):
 				pass
 
-			# Check if both are of type str  
+			# Check if both are of type str
 			elif all_of_type(both, str):
 				pass
 
-			# Check if all list are strings 
+			# Check if all list are strings
 			elif all_of_type(both, list) and all_of_type(setting, str):
 				pass
 
-			# Check if all dict values are strings 
+			# Check if all dict values are strings
 			elif all_of_type(both, dict) and all_of_type(list(setting.values()), str):
 				pass
 
-			# If not, setting is invalid 
+			# If not, setting is invalid
 			else:
 				setting_is_valid = False
 
-			# Check if the value is one of the possible values 
+			# Check if the value is one of the possible values
 			if (setting_is_valid and possible_values) and not is_possible_value(setting, possible_values):
 				setting_is_valid = False
 
@@ -128,31 +126,3 @@ class Settings(object):
 					print('Customizations: You messed up a setting', setting_name, setting, default)
 
 		# print(self.settings)
-			
-
-
-
-
-
-
-
-class ViewListener(sublime_plugin.EventListener):
-	def on_new(self, view):
-		s = view.settings()
-		s.set('gulp_server', {})
-
-
-
-
-
-
-def plugin_loaded():
-	for view in all_views():
-		s = view.settings()
-		s.set('gulp_server', {})
-		
-		if isinstance(s.get('report_id'), str):
-			s.set('syntax', 'Packages/Default/Find Results.hidden-tmLanguage')
-			s.set('result_file_regex', '^([A-Za-z\\\\/<].*):$')
-			s.set('result_line_regex', '^ +([0-9]+):')
-

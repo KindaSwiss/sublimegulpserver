@@ -88,11 +88,11 @@ def get_source_scope(view):
 
 
 
-def parse_commands(data_bytes, end_of_message="\n"):
+def parse_messages(data_bytes, end_of_message="\n"):
 	messages = data_bytes.decode('UTF-8').split(end_of_message)
 	data_strings = [string for string in messages if string]
-	commands = [json.loads(data_string) for data_string in data_strings if data_string]
-	return commands
+	messages_json = [json.loads(data_string) for data_string in data_strings if data_string]
+	return messages_json
 
 
 

@@ -21,12 +21,3 @@ class Console(object):
 
 		if user_settings.get('dev'):
 			print(*args)
-
-
-
-
-
-
-
-
-

@@ -1,0 +1,12 @@
+{
+	"scroll_to_error": true,
+	"show_icon_at_error": true,
+	"show_error_popup": true,
+	"show_error_status": true,
+	"show_status_in_view": false,
+	"error_status_format": "{plugin_name} error, Line {line}, File: {file_name}",
+	"error_popup_format": "Line {line}; {message}",
+	"error_icon": "bookmark",
+	"port": 30048,
+	"dev": false,
+}

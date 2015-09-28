@@ -1,9 +1,9 @@
 
 # Gulp Commands
-[Gulp commands](https://github.com/KindaSwiss/sublimegulpserver/blob/master/GulpCommands.py) are used to execute code in Sublime Text, such as showing a error message in the status bar. They are not actual Sublime Text commands. The API for running the commands from a gulp file can be found [here](https://github.com/KindaSwiss/sublimejs/blob/master/docs/API.md#sublimeruncommand_name-args-init_args). 
+[Gulp commands](https://github.com/anthonykoch/sublimegulpserver/blob/master/GulpCommands.py) are used to execute code in Sublime Text, such as showing a error message in the status bar. They are not actual Sublime Text commands. The API for running the commands from a gulp file can be found [here](https://github.com/anthonykoch/gulp-sublime/blob/master/docs/API.md). 
 
 
-<br>
+
 
 
 ## Types of commands
@@ -22,16 +22,16 @@ def __init__(self, views):
 
 #### views
 
-Type: `str` or `list`
+Type: `str` | `list`
 
 May be either `'<all>'`, meaning get all views from every window, or a list of file names of which views with the same open file will be retrieved. The command will run on the views retrieved. 
 
 
-<br>
+
 
 
 ## Commands
-<!--  -->
+
 Below is a list of commands and their arguments. 
 
 ### SetStatusCommand
@@ -78,6 +78,7 @@ A settings object to retrieve the format string from.
 
 
 
+
 ### EraseStatusCommand
 
 Type: `ViewCommand`
@@ -93,6 +94,7 @@ Remove the status bar message with the specified `id`.
 Type: `str`
 
 The id of the status to remove. 
+
 
 
 
@@ -116,6 +118,7 @@ The ID to associate with the gutter icon regions and status messages.
 
 
 
+
 ### EraseErrorsCommand
 
 Type: `ViewCommand`
@@ -135,6 +138,7 @@ The ID of the regions and status messages to remove.
 
 
 
+
 #### ShowPopupCommand
 
 Type: `ViewCommand`
@@ -144,32 +148,3 @@ def run(message=None, format=None, format_items=None, settings=False):
 ```
 
 Shows a popup in the view with the same file name as the specified file. Arguments work the same as set_status. 
-
-
-
-#### ReportCommand
-
-Type: `Command`
-
-```Python
-def run(self, reports, id):
-````
-
-Opens a new tab with JSHint results in the format of "Find in Files" results. File names and line numbers within the tab can be clicked to open the file, the same as a "Find in Files" results tab. 
-
-##### reports 
-
-Type: `list`
-
-A list of reports for each file that was run through JSHint. 
-
-##### id
-
-Type: `str`
-
-An ID to associate with the report tab. This allows the report tab to be updated instead of creating a new tab every time the reporter is run. 
-
-
-
-
-

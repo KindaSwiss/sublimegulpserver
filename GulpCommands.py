@@ -5,9 +5,27 @@ from sublime import Region
 from GulpServer.Utils import ignore, all_views, get_command_name, get_source_scope
 from GulpServer.Utils import get_views_by_ids, get_views_by_file_names, format_message
 from GulpServer.Utils import isstr, islist, isdict, isint, nth
-
 from GulpServer.Settings import Settings
 from GulpServer.Logging import Console
+
+
+
+
+popup_style = """
+<style>
+html {
+    background-color: #393b3d;
+    color: #CCCCCC;
+}
+
+body {
+    background-color: #232628;
+    margin: 1px;
+    padding: 1em 2em 1em 1em;
+    font-weight: 100;
+}
+</style>
+"""
 
 
 
@@ -74,31 +92,6 @@ class EraseStatusCommand(ViewCommand):
 
 
 
-# Print some data
-class PrintCommand(Command):
-	def run(self, **kwargs):
-		console.log(kwargs)
-
-
-
-style = """
-<style>
-html {
-    background-color: #393b3d;
-    color: #CCCCCC;
-}
-
-body {
-    background-color: #232628;
-    margin: 1px;
-    padding: 1em 2em 1em 1em;
-    font-weight: 100;
-}
-</style>
-"""
-
-
-
 # Displays a status message and popup for the error
 class ShowErrorCommand(ViewCommand):
 
@@ -117,7 +110,7 @@ class ShowErrorCommand(ViewCommand):
 				popup_message = user_settings.get('error_popup_format').format(**error)
 
 				# Show a popup message in the view where the error occured
-				view.show_popup(popup_message + style, max_width=500)
+				view.show_popup(popup_message + popup_style, max_width=500)
 
 			if line != None:
 				region = Region(view.text_point(line, 0))
@@ -180,22 +173,8 @@ def run_command(command_name, args, init_args=None):
 
 
 
-# Add a callback to when the data is received from the server
-def handle_received(command):
-	with ignore(Exception, origin="handle_received"):
-		console.log(command)
-		command_name = command['name']
-		data = command['data']
-		args = data['args']
-		init_args = data.get('init_args')
-
-		run_command(command_name, args, init_args)
-
-
-
-
 def get_commands():
-	""" Get the commands in the current module """
+	""" Get the commands in all module """
 	cmds = {}
 
 	for class_name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
@@ -215,6 +194,21 @@ console = None
 
 
 
+
+# Add a callback to when the data is received from the server
+def handle_received(command):
+	with ignore(Exception, origin="handle_received"):
+		console.log(command)
+		command_name = command['name']
+		data = command['data']
+		args = data['args']
+		init_args = data.get('init_args')
+
+		run_command(command_name, args, init_args)
+
+
+
+
 def plugin_loaded():
 	global user_settings, console
 
@@ -223,6 +217,3 @@ def plugin_loaded():
 
 	from GulpServer.Server import on_received
 	on_received(handle_received)
-
-
-
