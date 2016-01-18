@@ -1,10 +1,6 @@
-import sublime_plugin, sublime, sys, os
-from sublime import Region
-from functools import partial
-from GulpServer.Utils import all_of_type, all_views
-
-
-
+import sublime_plugin
+import sublime
+from EditorConnect.Utils import all_of_type
 
 def is_possible_value(setting, possible_values):
 	if isinstance(setting, list):
@@ -16,9 +12,8 @@ def is_possible_value(setting, possible_values):
 	else:
 		return setting in possible_values
 
-
-
-
+# FIXME: The verifying is so convoluted, should probably just be removed
+# and then just check where necessary
 class Settings(object):
 	""" A wrapper for a sublime.Settings object """
 
@@ -37,13 +32,13 @@ class Settings(object):
 		"error_status_format": ("{plugin_name} error, Line {line}, File: {file_name}", None),
 		"error_popup_format": ("Line {line}; {message}", None),
 		"error_icon": ("bookmark", {"dot", "circle", "bookmark", "cross"}),
-		"port": (30048, None),
+		"port": (35048, None),
 		"max_leading_spaces": (5, None),
 		"dev": (False, None),
 		"report_view": (False, None)
 	}
 
-	settings_path = 'GulpServer.sublime-settings'
+	settings_path = 'EditorConnect.sublime-settings'
 
 	def __init__(self, settings_path=None, load=True):
 
@@ -92,6 +87,7 @@ class Settings(object):
 			# print(setting_is_valid, setting_name, setting, default)
 
 			# Check if both are of type bool
+			# if all([isinstance(item, bool) for item in both]):
 			if all_of_type(both, bool):
 				pass
 
@@ -123,6 +119,4 @@ class Settings(object):
 				self.settings[setting_name] = setting
 			else:
 				if loaded_settings.get('show_setting_errors'):
-					print('Customizations: You messed up a setting', setting_name, setting, default)
-
-		# print(self.settings)
+					print('EditorConnect: You messed up a setting', setting_name, setting, default)

@@ -1,17 +1,13 @@
-import sublime, sublime_plugin, inspect, sys, os
-
+import sublime
+import sublime_plugin
+import inspect
+import sys
 from sublime import Region
+from EditorConnect.Utils import ignore, all_views, get_source_scope, get_views_by_file_names
+from EditorConnect.Settings import Settings
 
-from GulpServer.Utils import ignore, all_views, get_command_name, get_source_scope
-from GulpServer.Utils import get_views_by_ids, get_views_by_file_names, format_message
-from GulpServer.Utils import isstr, islist, isdict, isint, nth
-from GulpServer.Settings import Settings
-from GulpServer.Logging import Console
-
-
-
-
-popup_style = """
+POPUP_MAX_WIDTH = 700
+POPUP_STYLE = """
 <style>
 html {
     background-color: #393b3d;
@@ -27,75 +23,26 @@ body {
 </style>
 """
 
-
-
+# We keep track of the status bar message ids so that we can remove
+# them when the Gulp file disconnects.
+active_statuses = []
+user_settings = None
 
 class Command(object):
-	pass
-
-class ViewCommand(Command):
-	def __init__(self, views):
+	def __init__(self, views, task=None):
+		# The task is the name of a GulpJS task, suffixed with the pluginId
+		if task:
+			self.task = task
 
 		if views == '<all>':
 			self.views = all_views()
 		else:
 			self.views = get_views_by_file_names(views)
 
-
-
-
-# Show a popup message
-class ShowPopupCommand(ViewCommand):
-
-	# @param {str}      id
-	# @param {str|None} message      The message to show for the status, or None if the status
-	#                                message is to be retrieved from a template string in user_settings
-	# @param {str}      template     The template to use when formatting
-	# @param {dict}     format_items The items that template will be formatted with
-	def run(self, message, format, format_items, **kwargs):
-		message = kwargs.get('message')
-
-		# If the message wasn't sent in the command, create
-		# the message from the format string specified in the settings
-		if not isinstance(message, str):
-			message = format_message(format, format_items, user_settings)
-
-		for view in self.views:
-			view.show_popup(message)
-
-
-
-
-# Sets a status messages in the specified views
-class SetStatusCommand(ViewCommand):
-
-	def run(self, id, message=None, template=None, format_items=None, **kwargs):
-		# If the message wasn't sent in the command, create
-		# the message from the template string specified in the settings
-		if not isinstance(message, str):
-			message = format_message(template, format_items, user_settings)
-
-		for view in self.views:
-			view.set_status(id, message)
-
-
-
-
-# Erases status messages from the specified views
-class EraseStatusCommand(ViewCommand):
-
-	def run(self, id, **kwargs):
-
-		for view in self.views:
-			view.erase_status(id)
-
-
-
-
+# FIXME: The error status message should probably only show in the same view, not the current one
 # Displays a status message and popup for the error
-class ShowErrorCommand(ViewCommand):
-
-	def run(self, id, error, **kwargs):
+class ShowErrorCommand(Command):
+	def run(self, error, **kwargs):
 		file_name = error['file']
 		line = error['line']
 
@@ -104,13 +51,12 @@ class ShowErrorCommand(ViewCommand):
 		views = self.views
 
 		for view in views:
-
 			# Does the user want a popup to show?
 			if user_settings.get('show_error_popup'):
 				popup_message = user_settings.get('error_popup_format').format(**error)
 
 				# Show a popup message in the view where the error occured
-				view.show_popup(popup_message + popup_style, max_width=500)
+				view.show_popup(popup_message + POPUP_STYLE, max_width=POPUP_MAX_WIDTH)
 
 			if line != None:
 				region = Region(view.text_point(line, 0))
@@ -122,98 +68,87 @@ class ShowErrorCommand(ViewCommand):
 				# Show an icon at the line where the error occured
 				if user_settings.get('show_icon_at_error'):
 					icon = user_settings.get('error_icon')
-					view.add_regions(id, [region], get_source_scope(view), icon, sublime.DRAW_NO_OUTLINE)
+					view.add_regions(self.task, [region], get_source_scope(view), icon, sublime.DRAW_NO_OUTLINE)
 
 		# Does the user want a status message to be shown?
 		if user_settings.get('show_error_status'):
+			active_statuses.append(self.task)
 
 			# Does the user want the message to be shown in all
 			# views or the single view that caused the error?
 			if not user_settings.get('show_status_in_view'):
 				views = all_views()
 
-			status_message = format_message('error_status_format', error, user_settings)
+			status_message = user_settings.get('error_status_format').format(**error)
 
 			for view in views:
-				view.set_status(id, status_message)
-
-
-
+				view.set_status(self.task, status_message)
 
 # Erase gutters icons, status messages, etc associated with the id
-class EraseErrorsCommand(ViewCommand):
-	def run(self, id, **kwargs):
+class EraseErrorCommand(Command):
+	def run(self, **kwargs):
+		global active_statuses
+
+		if self.task in active_statuses:
+			active_statuses = [status for status in active_statuses if status != self.task]
 
 		for view in self.views:
-			view.erase_regions(id)
-			view.erase_status(id)
+			view.erase_regions(self.task)
+			view.erase_status(self.task)
 
-
-
-
-def run_command(command_name, args, init_args=None):
-
+def run_command(command_name, args, init_args):
 	if not command_name in commands:
 		raise Exception('Command not found for command name {0}'.format(command_name))
 
 	command_class = commands[command_name]
-
-	# Log the commands if in dev mode
-	if user_settings.get('dev'):
-		console.log(command_name, args, init_args)
-
-	if init_args:
-		command = command_class(**init_args)
-	else:
-		command = command_class()
+	command = command_class(**init_args)
 
 	with ignore(Exception, origin=command.__class__.__name__ + ".run"):
 		command.run(**args)
-
-
-
 
 def get_commands():
 	""" Get the commands in all module """
 	cmds = {}
 
 	for class_name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
-
 		if cls != Command and issubclass(cls, Command):
-			command_name = get_command_name(class_name)
+			command_name = class_name.replace('Command', '')
 			cmds[command_name] = cls
 
 	return cmds
 
-
-
-
 commands = get_commands()
-user_settings = None
-console = None
 
-
-
-
-# Add a callback to when the data is received from the server
+# Command should have a
 def handle_received(command):
-	with ignore(Exception, origin="handle_received"):
-		console.log(command)
-		command_name = command['name']
-		data = command['data']
-		args = data['args']
-		init_args = data.get('init_args')
+	command_name = command.get('name', None)
+	command_data = command.get('data', {})
+	# print(command_name, command_data, command)
 
-		run_command(command_name, args, init_args)
+	if command_name == None or command_data == None:
+		return
 
+	init_args = {
+		"views": command.get('views', []),
+		"task": command.get('task', None)
+	}
+	run_command(command_name, command_data, init_args)
 
-
+def handle_disconnect(id):
+	# Erase status and gutters messages when the gulpfile disconnects because
+	# when the gulpfile reconnects it won't override the same task names.
+	# This is because the task names are suffixed by an id that is unique to each gulp file.
+	for view in all_views():
+		for status in active_statuses:
+			if id in status:
+				view.erase_regions(status)
+				view.erase_status(status)
 
 def plugin_loaded():
-	global user_settings, console
-
+	from EditorConnect.Server import on_received, off_received, on_disconnect, off_disconnect
+	global user_settings
 	user_settings = Settings()
-	console = Console()
-
-	from GulpServer.Server import on_received
+	off_received(handle_received)
 	on_received(handle_received)
+	off_disconnect(handle_disconnect)
+	on_disconnect(handle_disconnect)
