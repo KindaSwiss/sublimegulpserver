@@ -7,5 +7,6 @@
 	"error_status_format": "{plugin_name} error, Line {line}, File: {file_name}",
 	"error_popup_format": "Line {line}; {message}",
 	"error_icon": "bookmark",
-	"port": 35048
+	"port": 35048,
+	"dev": false
 }

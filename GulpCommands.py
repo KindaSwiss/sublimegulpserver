@@ -123,7 +123,8 @@ commands = get_commands()
 def handle_received(command):
 	command_name = command.get('name', None)
 	command_data = command.get('data', {})
-	# print(command_name, command_data, command)
+	if user_settings.get('dev'):
+		print(command_name, command_data, command)
 
 	if command_name == None or command_data == None:
 		return

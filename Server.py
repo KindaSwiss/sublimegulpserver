@@ -85,7 +85,9 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 		try:
 			handshake = self.parser.decode(self.recvall())[0]
 		except Exception as ex:
-			print('Parsing error', ex)
+			if user_settings.get('dev'):
+				print('Handshake error', ex)
+
 			return False
 
 		plugin_id = handshake.get('pluginId')
@@ -94,7 +96,9 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 			self.id = plugin_id
 			self.server.add_client(self)
 			self.send(HANDSHAKE)
-			print('"{0}"'.format(self.id), 'connected', '- Total number connections:', len(self.server.clients))
+
+			if user_settings.get('dev'):
+				print('"{0}" connected - Total {1}'.format(self.id, len(self.server.clients)))
 
 			return True
 		else:
@@ -134,8 +138,6 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 		for callback in on_disconnect_callbacks:
 			callback(self.id)
 
-		print('"{0}"'.format(getattr(self, 'id', 'Unknown')), 'disconnected', '- Total number of connections', len(self.server.clients))
-
 	def send(self, data):
 		# Send data to the client
 		with ignore(Exception, origin='ThreadedTCPRequestHandler.send'):
@@ -144,7 +146,6 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 			return
 
 		self.finish()
-		print('finish after send')
 
 	# Keep receiving until an END_OF_MESSAGE is hit.
 	def recvall(self, buffer_size=4096):
@@ -159,7 +160,9 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 				data_bytes += self.request.recv(buffer_size)
 
 		except Exception as ex:
-			print('Receiving error', ex)
+			if user_settings.get('dev'):
+				print('Receiving error', ex)
+
 			return b''
 
 		return data_bytes
@@ -169,7 +172,7 @@ def start_server():
 	global server, server_thread
 
 	if server != None:
-		return print('Server is already running')
+		return print('Editor Connect server is already running')
 
 	# FIXME: Need to catch the error where previous server didn't shut down
 	server = ThreadedTCPServer((HOST, port), ThreadedTCPRequestHandler)
@@ -177,20 +180,20 @@ def start_server():
 	server_thread = Thread(target=server.serve_forever, daemon=True)
 	server_thread.deamon = True
 	server_thread.start()
-	print('Server started on port {0}'.format(port))
+	print('Editor Connect server started on port {0}'.format(port))
 
 def stop_server():
 	""" Stop the server """
 	global server
 
 	if server == None:
-		return print('Server is already shutdown')
+		return print('Editor Connect server is already shutdown')
 
 	server.close_requests()
 	server.shutdown()
 	server = None
 	server_thread = None
-	print('Server stopped')
+	print('Editor Connect server stopped')
 
 class StartServerCommand(sublime_plugin.ApplicationCommand):
 	""" Start the server """
