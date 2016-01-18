@@ -12,11 +12,6 @@ def ignore(*exceptions, origin="", message="", print_ex=True):
 			traceback.print_exc(limit=None, file=None, chain=True)
 			print()
 
-def all_of_type(items, t):
-	""" Check if all items are of a single type """
-	a = all([isinstance(item, t) for item in items])
-	return a
-
 def all_views():
 	""" Get all views from every window """
 	views = []
