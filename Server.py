@@ -76,7 +76,6 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 			client.finish()
 		self.clients = []
 
-
 class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 	""" Server request handler """
 
@@ -121,7 +120,6 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 					for message in messages:
 						for callback in on_received_callbacks:
 							callback(message)
-
 
 	def finish(self):
 		""" Tie up any loose ends with the request """
