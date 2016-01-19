@@ -4,7 +4,7 @@ import json
 import socketserver
 from threading import Thread
 from collections import defaultdict
-from EditorConnect.Utils import ignore
+from EditorConnect.Utils import ignore, EventEmitter
 from EditorConnect.Settings import Settings
 
 END_OF_MESSAGE_BYTE = b'\n'[0]
@@ -18,26 +18,7 @@ HOST = '127.0.0.1'
 port = None
 server = None
 server_thread = None
-
-on_received_callbacks = []
-on_disconnect_callbacks = []
-
-def on_received(callback):
-	""" Add a callback to the server's on_receive event """
-	on_received_callbacks.append(callback)
-
-def off_received(callback):
-	""" Removes the callback from the server's receive event """
-	global on_received_callbacks
-	on_received_callbacks = [cb for cb in on_received_callbacks if cb != cb]
-
-def on_disconnect(callback):
-	on_disconnect_callbacks.append(callback)
-
-def off_disconnect(callback):
-	""" Removes the callback from the server's receive event """
-	global on_disconnect_callbacks
-	on_disconnect_callbacks = [cb for cb in on_disconnect_callbacks if cb != cb]
+server_events = EventEmitter()
 
 class Parser():
 	""" Parses and encodes incoming and outgoing data from the server """
@@ -96,6 +77,7 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 			self.id = plugin_id
 			self.server.add_client(self)
 			self.send(HANDSHAKE)
+			server_events.emit('connect', plugin_id)
 
 			if user_settings.get('dev'):
 				print('"{0}" connected - Total {1}'.format(self.id, len(self.server.clients)))
@@ -120,10 +102,8 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 
 				messages = self.parser.decode(data_bytes)
 
-				with ignore(Exception, origin="ThreadedTCPRequestHandler.handle"):
-					for message in messages:
-						for callback in on_received_callbacks:
-							callback(message)
+				for message in messages:
+					server_events.emit('receive', message)
 
 	def finish(self):
 		""" Tie up any loose ends with the request """
@@ -134,9 +114,7 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 		# Remove self from list of server clients
 		self.server.remove_client(self)
 		self.closed = True
-
-		for callback in on_disconnect_callbacks:
-			callback(self.id)
+		server_events.emit('disconnect', self.id)
 
 	def send(self, data):
 		# Send data to the client

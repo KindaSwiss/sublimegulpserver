@@ -1,5 +1,6 @@
 import sublime
 import traceback
+from collections import defaultdict
 from contextlib import contextmanager
 
 @contextmanager
@@ -54,3 +55,24 @@ def nth(items, index):
 		return items[index]
 	except Exception:
 		return None
+
+class EventEmitter(object):
+	""" A class that can be used to emit events on """
+	def __init__(self):
+		self.events = defaultdict(list)
+
+	def emit(self, event_name, data=None):
+		""" Emits an event on the emitter """
+		print('EMITTER', event_name, self.events[event_name])
+		for cb in self.events[event_name]:
+			print(event_name, data)
+			cb(data)
+
+	def off(self, event_name, callback):
+		""" Removes a callback  to an event from the server """
+		callback_list = self.events[event_name]
+		self.events[event_name] = [cb for cb in callback_list if cb != callback]
+
+	def on(self, event_name, callback):
+		""" Subscribes to an event from the server """
+		self.events[event_name].append(callback)
