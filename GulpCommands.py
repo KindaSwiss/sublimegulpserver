@@ -149,6 +149,7 @@ def handle_disconnect(id):
 
 def plugin_unloaded():
 	from EditorConnect.Server import server_events
+
 	server_events.off('receive', handle_received)
 	server_events.off('disconnect', handle_disconnect)
 
