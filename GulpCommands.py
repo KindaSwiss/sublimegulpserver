@@ -3,6 +3,7 @@ import sublime_plugin
 import inspect
 import sys
 from sublime import Region
+# from EditorConnect.Server import server_events
 from EditorConnect.Utils import ignore, all_views, get_source_scope, get_views_by_file_names
 from EditorConnect.Settings import Settings
 
@@ -123,6 +124,7 @@ commands = get_commands()
 def handle_received(command):
 	command_name = command.get('name', None)
 	command_data = command.get('data', {})
+
 	if user_settings.get('dev'):
 		print(command_name, command_data, command)
 
@@ -145,11 +147,16 @@ def handle_disconnect(id):
 				view.erase_regions(status)
 				view.erase_status(status)
 
+def plugin_unloaded():
+	from EditorConnect.Server import server_events
+	server_events.off('receive', handle_received)
+	server_events.off('disconnect', handle_disconnect)
+
 def plugin_loaded():
-	from EditorConnect.Server import on_received, off_received, on_disconnect, off_disconnect
 	global user_settings
+
+	from EditorConnect.Server import server_events
+
 	user_settings = Settings()
-	off_received(handle_received)
-	on_received(handle_received)
-	off_disconnect(handle_disconnect)
-	on_disconnect(handle_disconnect)
+	server_events.on('receive', handle_received)
+	server_events.on('disconnect', handle_disconnect)
