@@ -63,9 +63,7 @@ class EventEmitter(object):
 
 	def emit(self, event_name, data=None):
 		""" Emits an event on the emitter """
-		print('EMITTER', event_name, self.events[event_name])
 		for cb in self.events[event_name]:
-			print(event_name, data)
 			cb(data)
 
 	def off(self, event_name, callback):
