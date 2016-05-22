@@ -7,6 +7,7 @@ from collections import defaultdict
 from EditorConnect.Utils import ignore, EventEmitter
 from EditorConnect.Settings import Settings
 
+
 END_OF_MESSAGE_BYTE = b'\n'[0]
 END_OF_MESSAGE_STR = '\n'
 HANDSHAKE = {
@@ -15,10 +16,12 @@ HANDSHAKE = {
 }
 HOST = '127.0.0.1'
 
+
 port = None
 server = None
 server_thread = None
 server_events = EventEmitter()
+
 
 class Parser():
 	""" Parses and encodes incoming and outgoing data from the server """
@@ -27,6 +30,7 @@ class Parser():
 
 	def decode(self, data):
 		return [json.loads(item) for item in str(data, encoding='utf8').split(END_OF_MESSAGE_STR) if item]
+
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 	def __init__(self, server_address, RequestHandlerClass):
@@ -56,6 +60,7 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 		for client in self.clients:
 			client.finish()
 		self.clients = []
+
 
 class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 	""" Server request handler """
@@ -145,6 +150,7 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 
 		return data_bytes
 
+
 def start_server():
 	""" Start the server """
 	global server, server_thread
@@ -160,6 +166,7 @@ def start_server():
 	server_thread.start()
 	print('Editor Connect server started on port {0}'.format(port))
 
+
 def stop_server():
 	""" Stop the server """
 	global server
@@ -173,13 +180,15 @@ def stop_server():
 	server_thread = None
 	print('Editor Connect server stopped')
 
+
 class StartServerCommand(sublime_plugin.ApplicationCommand):
 	""" Start the server """
 	def run(self):
-		sublime.set_timeout_async(start_server, 3000)
+		sublime.set_timeout_async(start_server, 2000)
 
 	def is_enabled(self):
 		return server == None and server_thread != None and not server_thread.is_alive()
+
 
 class StopServerCommand(sublime_plugin.ApplicationCommand):
 	""" Stop the server """
@@ -189,12 +198,14 @@ class StopServerCommand(sublime_plugin.ApplicationCommand):
 	def is_enabled(self):
 		return server != None and server_thread != None and server_thread.is_alive()
 
+
 def plugin_loaded():
 	global user_settings, port
 	user_settings = Settings()
 	port = user_settings.get('port')
 	# Setting a timeout will ensure the port is clear for reuse
-	sublime.set_timeout_async(start_server, 3000)
+	sublime.set_timeout_async(start_server, 2000)
+
 
 def plugin_unloaded():
 	stop_server()

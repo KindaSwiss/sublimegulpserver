@@ -3,6 +3,7 @@ import traceback
 from collections import defaultdict
 from contextlib import contextmanager
 
+
 @contextmanager
 def ignore(*exceptions, origin="", message="", print_ex=True):
 	try:
@@ -13,6 +14,7 @@ def ignore(*exceptions, origin="", message="", print_ex=True):
 			traceback.print_exc(limit=None, file=None, chain=True)
 			print()
 
+
 def all_views():
 	""" Get all views from every window """
 	views = []
@@ -21,10 +23,12 @@ def all_views():
 			views.append(view)
 	return views
 
+
 # @param {list} ids
 def get_views_by_ids(ids):
 	""" Returns a list of views whose ids match the ids passed """
 	return [view for view in all_views() if view.id() in (ids if isinstance(ids, list) else [ids])]
+
 
 # @param {str|list} file_names
 def get_views_by_file_names(file_names):
@@ -42,10 +46,12 @@ def get_views_by_file_names(file_names):
 
 	return views
 
+
 # @param {View} view
 def get_source_scope(view):
 	""" Returns the source scope of the page, such as source.python """
 	return view.scope_name(0).split(' ')[0]
+
 
 # @param {list} items
 # @param {int} index
@@ -55,6 +61,7 @@ def nth(items, index):
 		return items[index]
 	except Exception:
 		return None
+
 
 class EventEmitter(object):
 	""" A class that can be used to emit events on """

@@ -3,9 +3,13 @@ import sublime_plugin
 import inspect
 import sys
 from sublime import Region
-# from EditorConnect.Server import server_events
 from EditorConnect.Utils import ignore, all_views, get_source_scope, get_views_by_file_names
 from EditorConnect.Settings import Settings
+
+
+def p(text):
+	return """ <p>{0}</p>""".format(text)
+
 
 POPUP_MAX_WIDTH = 700
 POPUP_STYLE = """
@@ -24,10 +28,13 @@ body {
 </style>
 """
 
+
 # We keep track of the status bar message ids so that we can remove
 # them when the Gulp file disconnects.
 active_statuses = []
 user_settings = None
+commands = {}
+
 
 class Command(object):
 	def __init__(self, views, task=None):
@@ -40,12 +47,13 @@ class Command(object):
 		else:
 			self.views = get_views_by_file_names(views)
 
+
 # FIXME: The error status message should probably only show in the same view, not the current one
 # Displays a status message and popup for the error
 class ShowErrorCommand(Command):
 	def run(self, error, **kwargs):
 		file_name = error['file']
-		line = error['line']
+		line = error['line'] - 1
 
 		# There should only be one view, which is the file the error occured in
 		# Could add a setting/keybinding to open the file if not already open
@@ -58,6 +66,7 @@ class ShowErrorCommand(Command):
 
 				# Show a popup message in the view where the error occured
 				view.show_popup(popup_message + POPUP_STYLE, max_width=POPUP_MAX_WIDTH)
+				print(p(popup_message) + POPUP_STYLE)
 
 			if line != None:
 				region = Region(view.text_point(line, 0))
@@ -85,6 +94,7 @@ class ShowErrorCommand(Command):
 			for view in views:
 				view.set_status(self.task, status_message)
 
+
 # Erase gutters icons, status messages, etc associated with the id
 class EraseErrorCommand(Command):
 	def run(self, **kwargs):
@@ -97,9 +107,17 @@ class EraseErrorCommand(Command):
 			view.erase_regions(self.task)
 			view.erase_status(self.task)
 
+
+def get_command_name(command_class):
+	return command_class.__name__.replace('Command', '')
+
+
 def run_command(command_name, args, init_args):
-	if not command_name in commands:
-		raise Exception('Command not found for command name {0}'.format(command_name))
+	if command_name not in commands:
+		if user_settings.get('dev'):
+			print('Command not found for command name {0}'.format(command_name))
+
+		return
 
 	command_class = commands[command_name]
 	command = command_class(**init_args)
@@ -107,18 +125,22 @@ def run_command(command_name, args, init_args):
 	with ignore(Exception, origin=command.__class__.__name__ + ".run"):
 		command.run(**args)
 
+
+def add_commands(new_commands):
+	for command_class in new_commands:
+		commands[get_command_name(command_class)] = command_class
+		print(commands)
+
+
 def get_commands():
 	""" Get the commands in all module """
-	cmds = {}
+	global commands
 
 	for class_name, cls in inspect.getmembers(sys.modules[__name__], inspect.isclass):
 		if cls != Command and issubclass(cls, Command):
-			command_name = class_name.replace('Command', '')
-			cmds[command_name] = cls
+			command_name = get_command_name(cls)
+			commands[command_name] = cls
 
-	return cmds
-
-commands = get_commands()
 
 # Command should have a
 def handle_received(command):
@@ -137,6 +159,7 @@ def handle_received(command):
 	}
 	run_command(command_name, command_data, init_args)
 
+
 def handle_disconnect(id):
 	# Erase status and gutters messages when the gulpfile disconnects because
 	# when the gulpfile reconnects it won't override the same task names.
@@ -147,17 +170,20 @@ def handle_disconnect(id):
 				view.erase_regions(status)
 				view.erase_status(status)
 
+
 def plugin_unloaded():
 	from EditorConnect.Server import server_events
 
 	server_events.off('receive', handle_received)
 	server_events.off('disconnect', handle_disconnect)
 
+
 def plugin_loaded():
-	global user_settings
+	global user_settings, commands
 
 	from EditorConnect.Server import server_events
 
+	get_commands()
 	user_settings = Settings()
 	server_events.on('receive', handle_received)
 	server_events.on('disconnect', handle_disconnect)
