@@ -1,12 +1,23 @@
 import sublime_plugin
 import sublime
-import json
-import socketserver
 
-from threading import Thread
+import json
+import traceback
+
+from threading import Thread, Timer
 from collections import defaultdict
 
-from .SublimeTools.Utils import ignore, EventEmitter, Settings
+from .SublimeTools.Utils import pluck, EventEmitter, Settings
+
+# https://github.com/dpallot/simple-websocket-server
+from .SimpleWebSocketServer.SimpleWebSocketServer import SimpleWebSocketServer, WebSocket
+
+# # https://github.com/riga/pymitter
+# from .pymitter.pymitter import EventEmitter
+
+# https://github.com/necaris/cuid.py/blob/master/cuid.py
+from .cuid.cuid import cuid
+
 
 SETTINGS_PATH = 'EditorConnect.sublime-settings'
 
@@ -25,7 +36,6 @@ HANDSHAKE = {
 }
 
 HOST = '127.0.0.1'
-PORT = 35048
 
 port = None
 server = None
@@ -33,214 +43,290 @@ server_thread = None
 server_events = EventEmitter()
 
 
+api_types = ['call', 'call-reply']
+
+class Messages(object):
+
+    REPLY = 'call-reply'
+    CALL = 'call'
+
+    @staticmethod
+    def call(name, payload):
+        return {
+            'id': cuid(),
+            'type': Messages.CALL,
+            'event': name,
+            'payload': payload,
+        }
+
+    @staticmethod
+    def reply(payload, origin, part, done):
+        return {
+            'id': cuid(),
+            'type': Messages.REPLY,
+            'part': part,
+            'done': done,
+            'origin': {
+                'id': origin['id'],
+                'iid': origin['iid'],
+                'event': origin['event'],
+            },
+            'payload': payload,
+        };
+
+# class Call(object):
+
+    # def __init__
+
 class Parser():
     """ Parses and encodes incoming and outgoing data from the server """
+
     def encode(self, data):
         return json.dumps(data) + END_OF_MESSAGE_STR
 
     def decode(self, data):
-        return [json.loads(item) for item in str(data, encoding='utf8').split(END_OF_MESSAGE_STR) if item]
+        return [json.loads(item) for item in str(data).split(END_OF_MESSAGE_STR) if item]
 
 
-class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+def validate(message):
+    """ Returns true if the message conforms to the api """
 
-    def __init__(self, server_address, RequestHandlerClass):
-        socketserver.TCPServer.__init__(self, server_address, RequestHandlerClass)
-        self.clients = []
-        self.should_accept_requests = True
+    if not isinstance(message, dict):
+        return False
 
-    def add_client(self, client):
-        server.clients.append(client)
-        client.send({ 'handshake': True, 'accept': True })
-        print('\'{}\' has connected'.format(client.id))
+    type = message.get('type')
+    event = message.get('event')
+    id = message.get('id')
+    origin = message.get('origin', {})
+    origin_id = origin.get('id')
+    payload = message.get('payload')
+    part = message.get('part')
+    is_done = message.get('done')
 
-    def remove_client(self, client):
-        if client in self.clients:
-            self.clients.remove(client)
+    if type == Messages.CALL:
+        return all([
+            isinstance(event, str) and len(event) > 0 and
+            'payload' in message
+        ])
+
+    elif type == Messages.REPLY:
+        return all([
+            isinstance(part, int) and part >= 0 and
+            isinstance(is_done, bool) and
+            isinstance(origin_id, str) and len(origin_id) > 0 and
+            isinstance(event, str) and len(event) > 0 and
+            'payload' in message
+
+        ])
+
+    return False
+
+
+class WebSocketServerRequestHandler(WebSocket):
+
+    def handleMessage(self):
+        # simplesocketserver swallows exceptions, so we just have to catch them all and print them out
+        try:
+            try:
+                messages = self.server.parser.decode(self.data)
+            except Exception as ex:
+                raise Exception('Could not not decode messages ' + str(self.data))
+
+            if not isinstance(messages, list):
+                raise Exception('parser.decode did not return a dict')
+
+            for message in messages:
+                message_type = message.get('type')
+                event = message.get('event')
+                message_id = message.get('id')
+                origin = message.get('origin', {})
+                origin_id = origin.get('id')
+                payload = message.get('payload')
+
+                if not validate(message):
+                    raise Exception('Message does not conform to api' + str(message))
+
+                if message_type == Messages.CALL:
+                    origin = message
+                    part = 0
+                    is_done = False
+
+                    def reply(data, done=False):
+                        nonlocal part, is_done
+
+                        if is_done:
+                            raise Exception('reply called after done')
+
+                        is_done = done
+
+                        payload = self.server.parser.encode(Messages.reply(data, origin, part, done))
+                        self.sendMessage(payload)
+                        part += 1
+
+                    # Emit for everyone listening to events on the server
+                    self.server.hub.emit(event, payload, reply)
+
+                elif message_type == Messages.REPLY:
+                    # Fire the reply callback for the specified id
+                    self.server.api.emit('{0}:{1}'.format(Messages.REPLY, origin_id), message)
+        except Exception as ex:
+            traceback.print_exc()
+
+    def handleConnected(self):
+        self.server.clients.append(self)
+
+    def handleClose(self):
+        print('close')
+        self.server.clients.remove(self)
+
+
+class WebSocketServer(SimpleWebSocketServer):
+
+    def __init__(self, *args, **kwargs):
+        SimpleWebSocketServer.__init__(self, *args, **kwargs)
+
+        self.clients = [];
+        self.parser = kwargs.get('parser', Parser())
+        self.api = EventEmitter()
+        self.hub = EventEmitter()
 
     def send_all(self, data):
-        """ Send data to all clients """
         for client in self.clients:
-            client.send(data)
+            message = self.parser.encode(data)
+            client.sendMessage(message)
 
-    def send(self, data, id_name):
-        """ Send data to a specific client """
-        for client in self.clients:
-            if client.id == id_name:
-                client.send(data)
+    def on(self, name):
+        def _on(name, fn):
+            self.hub.on(name, fn)
 
-    def set_accept_requests(self, value):
-        self.should_accept_requests = value
+        def decorator(original):
+            if callable(original):
+                _on(name, original)
 
-    def close_requests(self):
-        """ Close all requests of the server """
-        for client in self.clients:
-            client.finish()
-            print('Closing request:', client.id)
+            return original
 
-        self.clients = []
+        return decorator
 
+    def off(self, name):
+        def _off(name, fn):
+            self.hub.off(name, fn)
 
-class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
-    """ Server request handler """
+        def decorator(original):
+            if callable(original):
+                _off(name, original)
 
-    def is_valid_handshake(self):
-        try:
-            handshake = self.parser.decode(self.recvall())[0]
-        except Exception as ex:
-            if user_settings.get('dev'):
-                print('Failed to decode handshake from client', ex)
+            return original
 
-            return False
+        return decorator
 
-        self.id = handshake.get('id')
-        print(handshake)
+    def call(
+            self,
+            name,
+            payload=None,
+            on_reply=None,
+            on_done=None,
+            reply_timeout=2000,
+            done_timeout=2000
+        ):
+        """ Sends out a call to all listeners """
+        if not self.is_listening:
+            return False;
 
-        if self.id == None:
-            return False
+        call = Messages.call(name, payload)
+        api_event_name = 'call-reply:{0}'.format(call['id'])
+        off = lambda: self.api.off(api_event_name, on_reply)
+        parts = []
 
-        if self.id in [client.id for client in self.server.clients]:
-            raise Exception('Client with id {} is already connected'.format(self.id))
+        def on_reply_from_call(message):
+            part, done, payload = pluck(message, 'part', 'done', 'payload')
+            # print('reply', part, done, data)
 
-        self.server.add_client(self)
-        self.send(HANDSHAKE)
-        server_events.emit('connect', self.id)
+            parts.append(payload)
+            reply_timer.cancel()
 
-        if user_settings.get('dev'):
-            print('"{0}" connected - Total {1}'.format(self.id, len(self.server.clients)))
+            if done:
+                done_timer.cancel()
+                off()
+
+                if callable(on_done):
+                    on_done(payload, parts, part)
+            else:
+                # maybe asyncio will make this more consistent with the nodejs api
+                if callable(on_reply):
+                    on_reply(payload, part)
+
+        self.api.on(api_event_name, on_reply_from_call);
+        self.send_all(call)
+
+        def on_timeout(name):
+            off()
+            raise Exception('timeout until {name} timeout has been exceeded'.format(name=name))
+
+        reply_timer = Timer(reply_timeout / 1000, lambda: on_timeout('first reply'))
+        reply_timer.start()
+
+        done_timer = Timer(done_timeout / 1000, lambda: on_timeout('done'))
+        done_timer.start()
 
         return True
 
-    def ensure_handshake(self):
-        if self.id == None:
-            self.finish()
-
-    def handle(self):
-        self.should_receive = True
-        self.closed = False
-        self.id = None
-        self.parser = Parser();
-
-        sublime.set_timeout_async(self.ensure_handshake, 1000)
-
-        if not self.server.should_accept_requests:
-            print('Not accepting new clients')
-            return self.finish()
-
-        with ignore(Exception, origin="ThreadedTCPRequestHandler.handle"):
-            if not self.is_valid_handshake():
-                print('Invalid handshake from ' + str(self.id))
-                return self.finish()
-
-            while self.should_receive:
-                data_bytes = self.recvall()
-
-                if not data_bytes:
-                    break
-
-                messages = self.parser.decode(data_bytes)
-
-                for message in messages:
-                    server_events.emit('message', message)
-
-    def finish(self):
-        """ Tie up any loose ends with the request """
-
-        # If the client has not already been closed then close it
-        if not self.closed:
-            self.request.close()
-
-        # Remove self from list of server clients
-        self.server.remove_client(self)
-        self.closed = True
-        server_events.emit('disconnect', self.id)
-
-    def send(self, data):
-        # Send data to the client
-        with ignore(Exception, origin='ThreadedTCPRequestHandler.send'):
-            data = self.parser.encode(data)
-            self.request.sendall((data).encode('utf8'))
-            return
-
-        self.finish()
-
-    # Keep receiving until an END_OF_MESSAGE is hit.
-    def recvall(self, buffer_size=4096):
-        try:
-            data_bytes = self.request.recv(buffer_size)
-
-            if not data_bytes:
-                return data_bytes
-
-            # Keep receiving until the end of message is hit
-            while data_bytes[-1] != END_OF_MESSAGE_BYTE:
-                data_bytes += self.request.recv(buffer_size)
-
-        except Exception as ex:
-            if user_settings.get('dev'):
-                print('Receiving error', ex)
-
-            return b''
-
-        return data_bytes
-
-
 def start_server():
-    """ Start the server """
+    """ Start the server if it isn't running """
     global server, server_thread
 
-    if server != None:
+    if server is not None and server.is_listening:
         return print('Editor Connect server is already running')
 
-    # FIXME: Need to catch the error where previous server didn't shut down
-    server = ThreadedTCPServer((HOST, port), ThreadedTCPRequestHandler)
-    server_thread = Thread(target=server.serve_forever, daemon=True)
+    server = WebSocketServer(HOST, user_settings.get('port'), WebSocketServerRequestHandler)
+    server_thread = Thread(target=server.serveforever, daemon=True)
     server_thread.start()
+    server.is_listening = True
+
     print('Editor Connect server started on port {0}'.format(port))
 
 
 def stop_server():
-    """ Stop the server """
+    """ Stop the server if it's running """
     global server
 
-    if server == None:
+    if server is None or not server.is_listening:
         return print('Editor Connect server is already shutdown')
 
-    print('closing requests')
-    server.set_accept_requests(False)
-    server.close_requests()
-    server.shutdown()
-    server = None
+    server.close()
     server_thread = None
+    server.is_listening = False
+
     print('Editor Connect server stopped')
 
 
 class StartServerCommand(sublime_plugin.ApplicationCommand):
-    """ Start the server """
+    """ Start the server if it isn't running """
     def run(self):
         sublime.set_timeout_async(start_server, SERVER_START_DELAY)
 
     def is_enabled(self):
-        return server == None and server_thread != None and not server_thread.is_alive()
+        return (server == None and not server.is_listening) and server_thread != None and not server_thread.is_alive()
 
 
-class StopServerCommand(sublime_plugin.ApplicationCommand):
-    """ Stop the server """
+class StartServerCommand(sublime_plugin.ApplicationCommand):
+    """ Start the server if it isn't running """
     def run(self):
-        stop_server()
+        sublime.set_timeout_async(start_server, SERVER_START_DELAY)
 
     def is_enabled(self):
-        return server != None and server_thread != None and server_thread.is_alive()
+        return (server == None and not server.is_listening) and server_thread != None and not server_thread.is_alive()
+
 
 
 def plugin_loaded():
     global user_settings, port
     user_settings = Settings(SETTINGS_PATH)
-    port = user_settings.get('port', PORT)
+    port = user_settings.get('port')
 
     # Setting a timeout will ensure the port is clear for reuse
     sublime.set_timeout(start_server, SERVER_START_DELAY)
 
+    print('Plugin loaded!')
 
 def plugin_unloaded():
     stop_server()

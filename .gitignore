@@ -1,3 +1,4 @@
+.DS_Store
 extras.txt
 npm-debug.log
 /node_modules

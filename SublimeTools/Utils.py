@@ -23,6 +23,10 @@ def ignore(*exceptions, origin="", print_ex=True):
             print()
 
 
+# https://stackoverflow.com/questions/2955412/python-destructuring-bind-dictionary-contents
+pluck = lambda dict, *args: (dict.get(arg) for arg in args)
+
+
 def all_views():
     """ Get all views from every window """
 
