@@ -72,4 +72,4 @@ Is called when the other side sends the last payload.
 ## Todo
 
 - Set up logging
-
+- Actually add the ability to do `server.on('event', callback)` instead of only the decorator way.
