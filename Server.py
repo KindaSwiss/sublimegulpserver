@@ -11,6 +11,7 @@ from SublimeTools.Settings import Settings
 from SublimeTools.EventEmitter import EventEmitter
 from SublimeTools.Utils import pluck, incremental_id_factory
 from SublimeTools.cuid import cuid
+from SublimeTools.Logging import Logger
 
 # https://github.com/dpallot/simple-websocket-server
 from .SimpleWebSocketServer.SimpleWebSocketServer import SimpleWebSocketServer, WebSocket
@@ -39,11 +40,14 @@ ORIGIN = {
 HOST = '127.0.0.1'
 
 port = None
-server = None
-server_thread = None
+websocket_server = None
+websocket_server_thread = None
 
 create_call_id = incremental_id_factory()
 create_reply_id = incremental_id_factory()
+
+
+logger = Logger(name='EditorConnect')
 
 
 class Messages(object):
@@ -217,7 +221,7 @@ class WebSocketServerRequestHandler(WebSocket):
                     raise Exception('Message does not conform to api' + str(message))
 
                 if message_type == Messages.CALL:
-                    # print('Incoming call:', message)
+                    logger.info('Received incoming call', message)
                     origin = message
                     part = 0
                     is_done = False
@@ -240,36 +244,29 @@ class WebSocketServerRequestHandler(WebSocket):
                         part += 1
 
                     # Emit for everyone listening to events on the server
-                    self.server.emit(event, payload, reply)
+                    self.server.hub.emit(event, payload, reply)
 
                 elif message_type == Messages.REPLY:
-                    # print('Incoming reply:', message)
+                    logger.info('Received incoming reply', message)
                     # Fire the reply callback for the specified id
                     self.server.api.emit('{0}:{1}'.format(Messages.REPLY, to['id']), message)
 
                 elif message_type == Messages.HANDSHAKE:
                     # self.server.emit('handshake')
-
-                    for client in self.server.clients:
-                        if client.id == origin['id']:
-                            self.close()
-                            return print('Client with id "{}" already exists'.format(client.id))
-
-                    self.id = origin['id']
-                    self.send(Messages.handshake_accept(None, message, ORIGIN))
-                    self.server.clients.append(self)
-                    self.server.emit('{0}:{1}'.format(Messages.HANDSHAKE_ACCEPT, self.id))
-                    print('Accepting client {}'.format(self.id))
+                    logger.info('Handshake received', message)
+                    self.server.add_client(self, message)
+                else:
+                    logger.info('Ya dun fucked up', message)
 
         except Exception as ex:
             traceback.print_exc()
 
     def handleConnected(self):
-        print('Client connected')
+        logger.info('Client connected')
 
     def handleClose(self):
-        print('Client closed')
-        self.server.clients.remove(self)
+        logger.info('Client<{}> closed'.format(client.id))
+        self.server.remove_client(self)
 
 
 class WebSocketServer(SimpleWebSocketServer, EventEmitter):
@@ -279,17 +276,38 @@ class WebSocketServer(SimpleWebSocketServer, EventEmitter):
         self.clients = []
         self.parser = kwargs.get('parser', Parser())
         self.api = EventEmitter()
+        self.origin = kwargs.get('origin', ORIGIN)
+        self.hub = server
 
         options = {
-            'wildcard': ':',
+            'wildcard': kwargs.get('wildcard', ':'),
         }
-        options.update(kwargs)
 
-        EventEmitter.__init__(self,
-            **options
-        )
+        EventEmitter.__init__(self, **options)
 
         SimpleWebSocketServer.__init__(self, *args, **kwargs)
+
+    def add_client(self, client, message):
+        origin = message['origin']
+
+        for existing_client in self.clients:
+            if existing_client.id == origin['id']:
+                client.close()
+                logger.error('Client with id "{}" already exists'.format(client.id))
+                return
+
+        client.id = origin['id']
+        client.send(Messages.handshake_accept(None, message, self.origin))
+        self.clients.append(client)
+        self.hub.emit('self:client:accept:{}'.format(client.id))
+        self.hub.emit('self:client:accept', client.id)
+        logger.info('Accepting client {}'.format(client.id))
+
+    def remove_client(self, client):
+        if client in self.clients:
+            self.clients.remove(client)
+            self.hub.emit('self:client:close:{}'.format(client.id))
+            self.hub.emit('self:client:close', client.id)
 
     def send_all(self, data):
         for client in self.clients:
@@ -311,7 +329,8 @@ class WebSocketServer(SimpleWebSocketServer, EventEmitter):
             origin=None,
         ):
         """ Sends out a call to all listeners """
-        if not self.is_listening:
+
+        if websocket_server is None:
             return False
 
         send_origin = ORIGIN.copy()
@@ -348,11 +367,10 @@ class WebSocketServer(SimpleWebSocketServer, EventEmitter):
         else:
             self.send_all(call)
 
-
         def on_timeout(name):
             off()
             # raise Exception('timeout until {name} timeout has been exceeded'.format(name=name))
-            print('timeout until {name} timeout has been exceeded'.format(name=name))
+            logger.error('timeout until {name} timeout has been exceeded'.format(name=name))
 
         reply_timer = Timer(reply_timeout / 1000, lambda: on_timeout('first reply'))
         reply_timer.start()
@@ -360,35 +378,88 @@ class WebSocketServer(SimpleWebSocketServer, EventEmitter):
         done_timer = Timer(done_timeout / 1000, lambda: on_timeout('done'))
         done_timer.start()
 
-        return True
+
+class Hub(EventEmitter):
+    """
+    The point of this is to make importing the server from other plugins easier.
+    Plugins need not worry if Server.server is None
+
+    Attributes:
+        is_listening (bool): Whether or not the server has been bound to a port
+    """
+
+    @property
+    def is_listening(self):
+        return websocket_server_thread is not None and websocket_server_thread.is_alive()
+
+    def stop(self):
+        stop_server()
+
+    def start(self):
+        start_server()
+
+    def clean_up(self):
+        clean_up()
+
+    def call(self, *args, **kwargs):
+        websocket_server.call(*args, **kwargs)
+
+    def send_all(self, *args, **kwargs):
+        websocket_server.send_all(*args, **kwargs)
+
+    def send_to(self, *args, **kwargs):
+        websocket_server.send_to(*args, **kwargs)
+
+
+
 
 def start_server():
     """ Start the server if it isn't running """
-    global server, server_thread
+    global websocket_server, websocket_server_thread
 
-    if server is not None and server.is_listening:
-        return print('Editor Connect server is already running')
+    if websocket_server is not None:
+        logger.warning('server is already running')
 
-    server = WebSocketServer(HOST, user_settings.get('port'), WebSocketServerRequestHandler)
-    server_thread = Thread(target=server.serveforever, daemon=True)
-    server_thread.start()
-    server.is_listening = True
+        return False
 
-    print('Editor Connect server started on port {0}'.format(port))
+    server.emit('self:pre-start')
+    websocket_server = WebSocketServer(HOST, user_settings.get('port'), WebSocketServerRequestHandler)
+    websocket_server_thread = Thread(target=websocket_server.serveforever, daemon=True)
+    websocket_server_thread.start()
+    server.emit('self:start')
+
+    logger.info('server started on port {0}'.format(port))
+
+    return True
 
 
 def stop_server():
-    """ Stop the server if it's running """
-    global server
+    """
+    Stop the server if it's running
 
-    if server is None or not server.is_listening:
-        return print('Editor Connect server is already shutdown')
+    Returns:
+        True if the server was able to be stopped
+    """
+    global websocket_server
 
-    server.close()
-    server_thread = None
-    server.is_listening = False
+    if websocket_server is None:
+        logger.warning('Editor Connect server is already shutdown')
+        return False
 
-    print('Editor Connect server stopped')
+    server.emit('self:pre-stop')
+    websocket_server.close()
+    websocket_server_thread = None
+    server.emit('self:stop')
+    logger.info('Editor Connect server stopped')
+
+    return True
+
+def clean_up():
+    if websocket_server is not None:
+        server.emit('self:pre-clean-up')
+        websocket_server.off_all()
+        websocket_server.api.off_all()
+        server.emit('self:clean-up')
 
 
 class StartServerCommand(sublime_plugin.ApplicationCommand):
@@ -397,16 +468,11 @@ class StartServerCommand(sublime_plugin.ApplicationCommand):
         sublime.set_timeout_async(start_server, SERVER_START_DELAY)
 
     def is_enabled(self):
-        return (server == None and not server.is_listening) and server_thread != None and not server_thread.is_alive()
+        return not server.is_listening
 
 
-class StartServerCommand(sublime_plugin.ApplicationCommand):
-    """ Start the server if it isn't running """
-    def run(self):
-        sublime.set_timeout_async(start_server, SERVER_START_DELAY)
-
-    def is_enabled(self):
-        return (server == None and not server.is_listening) and server_thread != None and not server_thread.is_alive()
+# Server events and incoming calls will be emitted through this mock server
+server = Hub()
 
 
 def plugin_loaded():
@@ -417,6 +483,6 @@ def plugin_loaded():
     # Setting a timeout will ensure the port is clear for reuse
     sublime.set_timeout(start_server, SERVER_START_DELAY)
 
-
 def plugin_unloaded():
     stop_server()
+    clean_up()
