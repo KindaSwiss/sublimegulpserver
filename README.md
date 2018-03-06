@@ -3,9 +3,16 @@
 A server for scripts to connect to sublime and send data back and forth to plugins through by means of a call/reply messaging system served over websockets.
 
 
+## Credit where credit is due
+
+[SimpleWebSocketServer is MIT licensed by dpallot](https://github.com/dpallot/simple-websocket-server)
+
+
 ## Install
 
-Clone the repo into a folder named `EditorConnect` in the sublime packages directory. To find the packages directory, go to the `Preferences` tab and click `Browse packages...`. (This is not on packagecontrol.io)
+Clone this repo into a folder named `EditorConnect` in the sublime packages directory. To find the packages directory, go to the `Preferences` tab and click `Browse packages...`.
+
+Then clone https://github.com/anthonykoch/SublimeTools into the same packages directory into a folder called SublimeTools.
 
 
 ## Why?
@@ -54,7 +61,7 @@ def on_done(data, parts, part):
 server.call('lint:javascript', on_reply=on_reply, on_done=on_done)
 ```
 
-## on_reply(data: any, part: uint, done: bool)
+## on_reply(data: any, part: uint)
 
 May be called multiple times.
 
@@ -66,7 +73,7 @@ May be called multiple times.
 Is called when the other side sends the last payload.
 
 - `{str} data` is the resulting payload returned from the other side for the call.
-- `{uint} part` represents what part of the reply is being sent.
+- `{list} parts` a list of app payloads received for the call
 
 
 ## Todo
