@@ -56,6 +56,8 @@ class Messages(object):
     CALL = 'call'
     HANDSHAKE = 'handshake'
     HANDSHAKE_ACCEPT = 'handshake-accept'
+    PING = 'ping'
+    PONG = 'pong'
 
     @staticmethod
     def call(name, payload, origin):
@@ -121,7 +123,13 @@ class Messages(object):
         if not isinstance(message, dict):
             return False
 
-        return Messages.is_reply(message) or Messages.is_call(message) or Messages.is_handshake(message)
+        return (
+                Messages.is_reply(message) or
+                Messages.is_call(message) or
+                Messages.is_handshake(message) or
+                Messages.is_ping(message) or
+                Messages.is_pong(message)
+            )
 
     @staticmethod
     def is_handshake(message):
@@ -170,8 +178,31 @@ class Messages(object):
             is_non_empty_str(to.get('event')),
         ])
 
+    @staticmethod
+    def ping():
+        return { 'type': 'ping' }
 
-Messages.api_types = [Messages.REPLY, Messages.CALL, Messages.HANDSHAKE, Messages.HANDSHAKE_ACCEPT]
+    @staticmethod
+    def is_ping(message):
+        return message.get('type') == 'ping'
+
+    @staticmethod
+    def pong():
+        return { 'type': 'pong' }
+
+    @staticmethod
+    def is_pong(message):
+        return message.get('type') == 'pong'
+
+
+Messages.api_types = [
+    Messages.REPLY,
+    Messages.CALL,
+    Messages.HANDSHAKE,
+    Messages.HANDSHAKE_ACCEPT,
+    Messages.PING,
+    Messages.PONG
+]
 
 
 class Parser():
@@ -255,6 +286,8 @@ class WebSocketServerRequestHandler(WebSocket):
                     # self.server.emit('handshake')
                     logger.info('Handshake received', message)
                     self.server.add_client(self, message)
+                elif message_type == Messages.PING:
+                    self.send(Messages.pong())
                 else:
                     logger.info('Ya dun fucked up', message)
 
